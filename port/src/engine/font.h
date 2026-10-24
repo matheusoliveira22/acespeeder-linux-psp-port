@@ -11,6 +11,9 @@ void font_init(void);
  * half-width characters are size wide and 2*size tall; rgb is 0xRRGGBB. Call between
  * gfx_begin_2d and gfx_end_2d. */
 void font_draw(int x, int y, int size, uint32_t rgb, int align, const char *text);
+/* font_draw without the translation (engine/lang.c defines font_draw, which
+ * swaps the game's Japanese strings for English when that is chosen) */
+void font_draw_text(int x, int y, int size, uint32_t rgb, int align, const char *text);
 int font_width(int size, const char *text);
 
 #endif

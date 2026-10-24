@@ -33,6 +33,12 @@
 #include "game/menu.h"
 #include "game/title.h"
 #include "platform/platform.h"
+#ifdef ACESPEEDER_SDL3
+#include <SDL3/SDL_main.h> /* makes main what SDL3 expects (SDL_main on Android) */
+#endif
+#ifdef REPLAYCHECK_IN_GAME
+int replaycheck_from_file(void); /* tools/replaycheck.c */
+#endif
 
 void Sound_LoadAll(void);
 
@@ -229,6 +235,13 @@ static void meter_draw(void)
 
 int main(int argc, char **argv)
 {
+#ifdef REPLAYCHECK_IN_GAME
+	/* Android: replaycheck.txt in the external files folder runs the replay check instead */
+	int replaycheck = replaycheck_from_file();
+	if (replaycheck >= 0) {
+		return replaycheck;
+	}
+#endif
 	if (plat_init() != 0) {
 		return 1;
 	}

@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "../engine/font.h"
+#include "../engine/lang.h"
 #include "../engine/rm.h"
 #include "../engine/sprite.h"
 #include "../platform/platform.h"
@@ -396,8 +397,14 @@ static void options_input(Menu *m, int i)
 		else if (m->cursor == 1) {
 			s->opt[3] = (int16_t)((s->opt[3] + 1) & 7);
 		}
-		else if (g_settings.fov < FOV_LEVELS - 1) {
-			g_settings.fov++;
+		else if (m->cursor == 2) {
+			if (g_settings.fov < FOV_LEVELS - 1) {
+				g_settings.fov++;
+			}
+		}
+		else {
+			g_settings.english = !g_settings.english;
+			lang_set_english(g_settings.english);
 		}
 	}
 	else if (pressed(IN_LEFT)) {
@@ -415,14 +422,20 @@ static void options_input(Menu *m, int i)
 		else if (m->cursor == 1) {
 			s->opt[3] = (int16_t)((s->opt[3] + 7) & 7);
 		}
-		else if (g_settings.fov > 0) {
-			g_settings.fov--;
+		else if (m->cursor == 2) {
+			if (g_settings.fov > 0) {
+				g_settings.fov--;
+			}
+		}
+		else {
+			g_settings.english = !g_settings.english;
+			lang_set_english(g_settings.english);
 		}
 	}
 	else if (pressed(IN_UP) || pressed(IN_DOWN)) {
-		/* the original has two rows; the port adds the field of view */
+		/* the original has two rows; the port adds the field of view and the language */
 		Sound_Play(4);
-		m->cursor = (int16_t)((m->cursor + (pressed(IN_UP) ? 2 : 1)) % 3);
+		m->cursor = (int16_t)((m->cursor + (pressed(IN_UP) ? 3 : 1)) % 4);
 	}
 	else if (pressed(IN_A)) {
 		Sound_Play(7);
@@ -830,6 +843,8 @@ static void render_options(Menu *m)
 	}
 	text(150, 320, 12, 0xffffff, FONT_LEFT, "FOV");
 	text(500, 320, 12, 0xffffff, FONT_RIGHT, Settings_FovName());
+	text(150, 370, 12, 0xffffff, FONT_LEFT, "Language");
+	text(500, 370, 12, 0xffffff, FONT_RIGHT, Settings_LangName());
 }
 
 static void render_texts(Menu *m, const MenuLayer *l)

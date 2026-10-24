@@ -1,0 +1,84 @@
+// Based on SDL's android-project template (third_party/SDL/android-project):
+// SDL's Java glue is used straight from the submodule, the native code is
+// port/CMakeLists.txt (the sdl3 backend), and the game's files are copied
+// into the APK's assets at build time (see port/android/README.md).
+plugins {
+    id 'com.android.application'
+}
+
+def localProps = new Properties()
+def localFile = rootProject.file('local.properties')
+if (localFile.exists()) localFile.withInputStream { localProps.load(it) }
+
+// Folder with the original game's files: -PaceSpeederGameDir=..., or
+// aceSpeederGameDir in local.properties, else the repository's game/. The
+// data generated from them (tools/make_android.sh: track_*.bin, *.ogg,
+// unlock.dat) likewise: aceSpeederGeneratedDir, else port/data.
+def gameDir = file(project.findProperty('aceSpeederGameDir')
+        ?: localProps.getProperty('aceSpeederGameDir')
+        ?: "${rootDir}/../../game")
+def generatedDir = file(project.findProperty('aceSpeederGeneratedDir')
+        ?: localProps.getProperty('aceSpeederGeneratedDir')
+        ?: "${rootDir}/../data")
+def gameAssetsDir = layout.buildDirectory.dir('gameAssets')
+
+android {
+    namespace = 'org.acespeeder.port'
+    compileSdk = 36
+    buildToolsVersion = '36.0.0'
+    ndkVersion = '30.0.16248370'
+
+    defaultConfig {
+        applicationId = 'org.acespeeder.port'
+        minSdk = 24
+        targetSdk = 36
+        versionCode = 1
+        versionName = '0.1'
+        externalNativeBuild {
+            cmake {
+                arguments '-DANDROID_STL=c++_static', '-DACESPEEDER_PLATFORM=sdl3'
+                abiFilters 'arm64-v8a'
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled = false
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path = file('../../CMakeLists.txt')
+        }
+    }
+    sourceSets {
+        main {
+            java.srcDirs += '../../third_party/SDL/android-project/app/src/main/java'
+            assets.srcDirs += gameAssetsDir
+        }
+    }
+    lint {
+        abortOnError = false
+    }
+}
+
+// What the game loads: the original's meshes, bitmaps, sounds and replays
+// (not the exe, DLLs or MIDI), and the generated data.
+def copyGameAssets = tasks.register('copyGameAssets', Sync) {
+    // Not gamedata.dat: it is the player's own save (unlocked once the password
+    // has been entered), as in tools/make_dist.sh
+    from(gameDir) {
+        include '*.x', '*.bmp', '*.wav', 'replay_*.dat'
+    }
+    from(generatedDir) {
+        include 'track_*.bin', '*.ogg', 'unlock.dat'
+    }
+    into gameAssetsDir.map { it.dir('data') }
+    doFirst {
+        if (!gameDir.isDirectory())
+            throw new GradleException("Game files not found at ${gameDir}; set aceSpeederGameDir")
+        if (!generatedDir.isDirectory())
+            throw new GradleException("Generated data not found at ${generatedDir}; run tools/make_android.sh or set aceSpeederGeneratedDir")
+    }
+}
+tasks.named('preBuild') { dependsOn copyGameAssets }

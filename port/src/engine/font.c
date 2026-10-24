@@ -89,7 +89,7 @@ int font_width(int size, const char *text)
 	return w;
 }
 
-void font_draw(int x, int y, int size, uint32_t rgb, int align, const char *text)
+void font_draw_text(int x, int y, int size, uint32_t rgb, int align, const char *text)
 {
 	if (align == FONT_CENTER) {
 		x -= font_width(size, text) / 2;

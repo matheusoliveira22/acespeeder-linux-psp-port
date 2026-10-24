@@ -1,15 +1,16 @@
-# AceSpeeder! for PSP and Linux
+# AceSpeeder! for PSP, Linux and Android
 
 A source port of **AceSpeeder!**, the freeware Windows racing game by Takahiro
-Nakatani / Production TN (2000), to the Sony PSP, with a Linux build used for
-development and testing.
+Nakatani / Production TN (2000), to the Sony PSP and Android, with a Linux
+build used for development and testing.
 
 The port is a reimplementation, not an emulator: the original executable was
 decompiled with Ghidra and its game logic rewritten in portable C. The race
 logic is checked against the original, which runs under an x86 emulator next to
 the port, and matches it bit for bit (the shipped replays finish with the same
 times). Graphics, sound and input go through a small platform layer: SDL2 and
-OpenGL on Linux, the PSP SDK's sceGu on the PSP.
+OpenGL on Linux, the PSP SDK's sceGu on the PSP, SDL3 and OpenGL ES 3 on
+Android (and macOS).
 
 **The original game files are not part of this repository.** You need your own
 copy of the AceSpeeder! folder. The port reads its meshes, bitmaps, sounds and
@@ -32,17 +33,21 @@ work of its author; keep the port and the converted files for personal use.
 AceSpeeder/
 ├── game/                   the original game folder (not in git; you provide it)
 ├── port/                   the port
-│   ├── CMakeLists.txt      Linux build
+│   ├── CMakeLists.txt      Linux build (and the sdl3 backend's native code)
 │   ├── Makefile.psp        PSP build
+│   ├── android/            Android app (Gradle), see android/README.md
 │   ├── src/
 │   │   ├── main.c          entry point and main loop (MainFrame: 33 ms logic ticks)
 │   │   ├── game/           the game, reimplemented from the executable
 │   │   ├── engine/         Direct3D Retained Mode stand-in, .x/.bmp loaders, font, sprites
 │   │   ├── platform/       platform layer: platform.h, mixer, software clipping
 │   │   │   ├── linux/      SDL2 + OpenGL backend
-│   │   │   └── psp/        sceGu backend
+│   │   │   ├── psp/        sceGu backend
+│   │   │   └── sdl3/       SDL3 + OpenGL ES 3 backend (Android, macOS)
 │   │   ├── third_party/    stb_vorbis
-│   │   └── tools/          viewer, trackview (debug programs), testlib.c (for the tests)
+│   │   └── tools/          viewer, trackview (debug programs), testlib.c (for the tests),
+│   │                       replaycheck (plays the shipped replays without drawing)
+│   ├── third_party/SDL/    SDL3 (git submodule, for the sdl3 backend)
 │   ├── tools/              build-time tools (data conversion, icons, packaging)
 │   ├── data/               generated data (not in git)
 │   ├── build/              Linux build directory (not in git)
@@ -169,6 +174,36 @@ Run it from `port/`, telling it where the data is:
 ACESPEEDER_DATA=data:../game build/acespeeder
 ```
 
+### Android
+
+The Android app uses the sdl3 backend (SDL3 and OpenGL ES 3, arm64-v8a). Build
+it on Linux or macOS with the Android SDK and NDK (`ANDROID_HOME`, or `sdk.dir`
+in `port/android/local.properties`) and a JDK 17 or newer; Gradle comes with
+`android/gradlew`. The data conversion needs the same tools as the PSP build.
+
+```sh
+git submodule update --init      # port/third_party/SDL
+cd port
+tools/make_android.sh            # data/ if missing, then the APK
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+The game's files and the generated data are copied into the APK. Installing,
+controls and debugging on a device: [port/android/README.md](port/android/README.md).
+
+### macOS (sdl3 backend)
+
+The same backend runs on macOS (OpenGL 4.1 core), which is handy for
+working on it:
+
+```sh
+git submodule update --init
+cd port
+cmake -S . -B build/sdl3 -DACESPEEDER_PLATFORM=sdl3
+cmake --build build/sdl3
+ACESPEEDER_DATA=data:../game build/sdl3/acespeeder
+```
+
 ## Where the outputs go
 
 | Output | Location |
@@ -180,7 +215,8 @@ ACESPEEDER_DATA=data:../game build/acespeeder
 | PSP menu images | `port/ICON0.PNG`, `port/PIC1.PNG` |
 | **Packaged PSP game** | **`port/dist/PSP/GAME/AceSpeeder/`** |
 | Linux game | `port/build/acespeeder` |
-| Linux debug programs | `port/build/viewer`, `port/build/trackview` |
+| Linux debug programs | `port/build/viewer`, `port/build/trackview`, `port/build/replaycheck` |
+| Android APK | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
 | Library for the differential tests | `port/build/libgametest.so` |
 | Saves on Linux | `~/.local/share/acespeeder/` (or `$ACESPEEDER_SAVE`) |
 | Saves on the PSP | `PSP/SAVEDATA/ACESPEED00000/` (system save data) |
@@ -237,14 +273,16 @@ open `EBOOT.PBP` directly from the folder in `dist`.
 
 ## Playing
 
-| PSP | Linux | Action |
-|---|---|---|
-| D-pad / analog stick | arrows | steer, move in the menus |
-| Cross | Space / Enter | accelerate, confirm |
-| Circle | Shift | back; pause (the original's key) |
-| Start | P | pause and resume a race, confirm in the menus |
-| Triangle | F1–F4 | change the camera view |
-| Select | F12 | show the performance meter |
+| PSP | Linux | Android gamepad | Action |
+|---|---|---|---|
+| D-pad / analog stick | arrows | D-pad / left stick | steer, move in the menus |
+| Cross | Space / Enter | A (bottom), R2 | accelerate, confirm |
+| Circle | Shift | B (right) | back; pause (the original's key) |
+| Start | P | Start | pause and resume a race, confirm in the menus |
+| Triangle | F1–F4 | Y, X, L1, R1 (F1–F4) | change the camera view |
+| Select | F12 | Select | show the performance meter |
+
+On Android the system Back button is the original's Esc.
 
 The performance meter shows, averaged over 30 frames, the time spent in the game
 logic, in building the frame and waiting for the GPU, and the frame rate.
@@ -252,7 +290,9 @@ logic, in building the frame and waiting for the GPU, and the frame rate.
 ### Settings added by the port
 
 The Setting screen in the menu has a third row, **FOV**, which widens the race
-camera's field of view (Original, Wide, Wider, Widest; Wide by default). It is
+camera's field of view (Original, Wide, Wider, Widest; Wide by default), and a
+fourth, **Language**, which shows the game's Japanese text (menus, pause
+screen, staff roll) in English or Japanese (English by default). They are
 saved with the music and sound effect volumes in `settings.txt`, next to the
 saves on Linux (inside the save data on the PSP):
 
@@ -260,7 +300,10 @@ saves on Linux (inside the save data on the PSP):
 fov=1
 music=100
 sfx=60
+lang=en
 ```
+
+`ACESPEEDER_LANG=ja` or `en` overrides the language for one run.
 
 The volumes are percentages (0–200) and can be edited by hand.
 
@@ -282,6 +325,9 @@ password is accepted. Please do not commit or share `unlock.dat`.
 - On the PSP, the logic advances once every second screen refresh: 29.97 times a
   second against the original's 30.3, about 1% slower.
 - On the PSP, the HUD and text designed for 640×480 are scaled to 480×272.
+- The text is in English unless Language is set to Japanese; the English is
+  the port's translation (the staff roll uses the original's own English
+  cards).
 
 ## Development
 
